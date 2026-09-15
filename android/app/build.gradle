@@ -1,5 +1,7 @@
-
-plugins { id 'com.android.application' id 'org.jetbrains.kotlin.android' }
+plugins {
+    id 'com.android.application' version '8.1.0' apply true
+    id 'org.jetbrains.kotlin.android' version '1.9.0' apply true
+}
 android {
     namespace 'com.aistudio.app'
     compileSdk 34
@@ -10,8 +12,15 @@ android {
         versionCode 3
         versionName "3.0-pure-fg"
     }
-    buildTypes { release { minifyEnabled false } }
-    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    buildTypes { 
+        release { 
+            minifyEnabled false 
+        } 
+    }
+    compileOptions { 
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17 
+    }
     kotlinOptions { jvmTarget = '17' }
 }
 dependencies {
