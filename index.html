@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AI STUDIO - Slider + Dev</title>
+<style>
+*{box-sizing:border-box}body{font-family:system-ui,sans-serif;max-width:920px;margin:0 auto;padding:12px;background:#0f172a;color:#f8fafc}
+.card{background:#1e293b;padding:14px;border-radius:12px;border:1px solid #334155}
+label{font-size:11px;color:#cbd5e1;font-weight:700;display:block;margin-top:10px;text-transform:uppercase}
+input,textarea,select{width:100%;padding:9px;margin-top:4px;background:#0f172a;border:1px solid #475569;border-radius:7px;color:#fff;font-size:13px}
+.row{display:flex;gap:8px}.col{flex:1;min-width:0}
+.file-box{border:2px dashed #475569;border-radius:8px;padding:8px;text-align:center;margin-top:4px}
+.small-btn{background:#334155;color:#fff;border:none;padding:5px 8px;border-radius:5px;font-size:11px;cursor:pointer}
+.small-btn.green{background:#16a34a}.small-btn.danger{background:#7f1d1d}
+.action-btn{background:#8b5cf6;color:#fff;border:none;padding:12px;width:100%;border-radius:9px;font-weight:800;margin-top:10px;cursor:pointer}
+.badge{background:#8b5cf6;color:#fff;font-size:9px;padding:2px 6px;border-radius:12px}
+.badge.green{background:#22c55e;color:#000}
+.api-card{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:8px;margin-top:6px;display:flex;gap:8px;align-items:center}
+.api-card.active{border-color:#22c55e}.api-dot{width:8px;height:8px;border-radius:50%;background:#475569}.api-dot.on{background:#22c55e}
+.segment{background:#1e293b;border:1px solid #334155;border-radius:8px;padding:10px;margin-top:8px;position:relative}
+.preview-img{height:50px;border-radius:6px;margin:2px;border:1px solid #475569}
+.note{font-size:10px;color:#94a3b8;margin-top:3px}
+.queue-box{border:1px solid #22c55e33;background:#0f172a;border-radius:10px;padding:8px;margin-top:10px}
+.settings-box{border:1px solid #8b5cf655;background:#111a2f;border-radius:10px;padding:10px;margin-top:12px}
+.timeline-track{height:24px;background:#0f172a;border:1px solid #334155;border-radius:6px;position:relative;margin:8px 0;overflow:hidden}
+.timeline-seg{position:absolute;top:0;bottom:0;background:#8b5cf644;border-right:1px solid #8b5cf6;display:flex;align-items:center;justify-content:center;font-size:9px}
+.timeline-handle{position:absolute;top:0;bottom:0;width:8px;background:#8b5cf6;cursor:ew-resize;z-index:2;border-radius:2px}
+.log-box{background:#000;border:1px solid #334155;border-radius:8px;padding:8px;max-height:200px;overflow-y:auto;font-family:monospace;font-size:10px;white-space:pre-wrap;margin-top:6px}
+input[type=range]{padding:0;margin:0}
+@media(max-width:600px){.row{flex-direction:column}}
+</style></head><body><div class="card">
+<h2>AI STUDIO <span class="badge">AGNES ONLY</span> <span class="badge green">SLIDER • 12С • DEV LOG</span></h2>
+
+<div class="row"><div class="col"><label>Фото до 5 (текущая)</label><div class="file-box"><input type="file" id="imgInput" accept="image/*" multiple onchange="handleImages(event)"><div id="imgPreview" style="display:flex;flex-wrap:wrap;justify-content:center"></div></div></div><div class="col"><label>Аудио до 3</label><div class="file-box"><input type="file" id="audioInput" accept="audio/*" multiple onchange="handleAudio(event)"><div id="audioList" style="font-size:11px;color:#a78bfa"></div></div></div></div>
+
+<div style="border:1px solid #7c3aed33;background:#0f172a;border-radius:10px;padding:8px;margin-top:10px">
+<div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:12px">🎬 Таймлайн — 1 по 12с по умолчанию, время делится ползунком</b><button class="small-btn" onclick="addSegment()">+ Тайминг</button></div>
+<div class="timeline-track" id="timelineTrack"></div>
+<div class="note">Тяни ползунки на шкале чтобы менять длительность. Сумма всегда 12с. Каждый тайминг: Эмоция + Камера + Речь + Промт (без Действия).</div>
+<div id="segmentsContainer"></div>
+<div style="background:#111a2f;border:1px solid #8b5cf655;border-radius:8px;padding:8px;margin-top:8px">
+<label style="margin-top:0">📝 Итоговый промт — говорит только то что в кавычках:</label><textarea id="finalPrompt" style="height:150px"></textarea>
+<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap"><button class="small-btn" onclick="navigator.clipboard.writeText(document.getElementById('finalPrompt').value)">Копировать</button><span id="wordCounter" style="font-size:11px">0 / 15 слов</span><span id="selectedApiInfo" style="font-size:10px;color:#22c55e"></span></div>
+</div></div>
+
+<div class="queue-box"><div style="display:flex;justify-content:space-between"><b style="font-size:12px">📋 Очередь — разные фото + разные Agnes ключи</b><span id="queueInfo" style="font-size:10px;color:#94a3b8">0 задач</span></div>
+<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+<button class="small-btn" style="background:#22c55e;color:#000;font-weight:800" onclick="addToQueue()">+ В очередь</button>
+<button class="small-btn" style="background:#8b5cf6" onclick="startQueue()">▶️ Запустить</button>
+<button class="small-btn" onclick="pauseQueue()">⏸ Пауза</button>
+<button class="small-btn danger" onclick="clearQueue()">Очистить</button>
+</div><div id="queueList" style="margin-top:8px;display:grid;gap:6px;max-height:500px;overflow-y:auto"></div></div>
+
+<button class="action-btn" onclick="generate()">🚀 Сгенерировать (Agnes)</button>
+<div id="status" style="text-align:center;font-size:12px;margin-top:8px"></div><div id="result"></div>
+
+<div class="settings-box"><b style="font-size:13px">⚙️ Настройки</b>
+<div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap">
+<label style="display:flex;gap:6px;align-items:center;font-size:12px;text-transform:none"><input type="checkbox" id="autoSaveToggle" checked style="width:auto"> Автосохранение на устройство (галка)</label>
+<label style="display:flex;gap:6px;align-items:center;font-size:12px;text-transform:none"><input type="checkbox" id="bgModeToggle" checked style="width:auto"> 🔒 Автономно при выкл. экране (APK)</label>
+<label style="display:flex;gap:6px;align-items:center;font-size:12px;text-transform:none"><input type="checkbox" id="devLogToggle" checked style="width:auto"> Включить лог разработчика</label>
+</div>
+
+<div style="margin-top:10px"><div style="display:flex;justify-content:space-between"><span style="font-size:11px">Agnes API ключи (ротация, только Agnes)</span><button class="small-btn green" onclick="showAddApi()">+ Добавить ключ</button></div>
+<div id="apiList" style="margin-top:6px"></div>
+<div id="addApiForm" style="display:none;background:#1e293b;border-radius:8px;padding:8px;margin-top:6px">
+<label>Название</label><input id="apiName" placeholder="Agnes #1">
+<label>API Key</label><input id="apiKeyInput" type="password" placeholder="sk-...">
+<div style="display:flex;gap:6px;margin-top:6px"><button class="small-btn green" onclick="saveApiProfile()">Сохранить</button><button class="small-btn" onclick="hideAddApi()">Отмена</button></div>
+</div>
+<div class="row" style="margin-top:8px"><div class="col"><label>Текущий ключ</label><select id="currentApiSelect" onchange="selectCurrentApi()"></select></div></div>
+</div>
+
+<div style="margin-top:12px;border-top:1px solid #334155;padding-top:8px">
+<b style="font-size:12px">🧪 Настройки разработчика и лог (для теста)</b>
+<div style="display:flex;gap:6px;margin-top:6px"><button class="small-btn" onclick="clearDevLog()">Очистить лог</button><button class="small-btn" onclick="exportLog()">Экспорт лога</button><span id="dbInfo" style="font-size:10px;color:#94a3b8"></span></div>
+<div id="devLog" class="log-box"></div>
+</div>
+</div>
+
+<div style="margin-top:10px;border-top:1px solid #334155;padding-top:8px"><b>📚 История</b> <button class="small-btn danger" onclick="localStorage.removeItem('agnesHistory');renderHistory()">Очистить</button><div id="history" style="display:grid;gap:6px;margin-top:6px"></div></div>
+</div>
+
+<script>
+let segments=[
+{id:1, duration:12, emotion:'улыбается', camera:'крупный план', speech:'Привет, я так рада тебя видеть', prompt:''}
+];
+let imagesBase64=[], audiosBase64=[];
+
+// DEV LOG
+function devLog(msg){
+  if(!document.getElementById('devLogToggle')?.checked) return;
+  const box=document.getElementById('devLog');
+  const t=new Date().toLocaleTimeString();
+  const line=`[${t}] ${msg}\n`;
+  box.textContent+=line;
+  box.scrollTop=box.scrollHeight;
+  console.log(line);
+}
+function clearDevLog(){document.getElementById('devLog').textContent='';}
+function exportLog(){
+  const blob=new Blob([document.getElementById('devLog').textContent], {type:'text/plain'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='ai-studio-log.txt'; a.click();
+}
+
+// API MANAGER - AGNES ONLY
+let apiProfiles = JSON.parse(localStorage.getItem('aiStudioApisAgnesOnly')||'[]');
+let currentApiId = localStorage.getItem('currentApiIdAgnes')||null;
+function defaultApis(){
+  if(apiProfiles.length==0){
+    apiProfiles=[
+      {id:'agnes_1', name:'Agnes #1', provider:'agnes', baseUrl:'https://apihub.agnes-ai.com', apiKey:'', enabled:true},
+      {id:'agnes_2', name:'Agnes #2 резерв', provider:'agnes', baseUrl:'https://apihub.agnes-ai.com', apiKey:'', enabled:true}
+    ];
+    saveApis();
+  }
+}
+function saveApis(){localStorage.setItem('aiStudioApisAgnesOnly', JSON.stringify(apiProfiles)); if(currentApiId) localStorage.setItem('currentApiIdAgnes', currentApiId); renderApis(); updateDbInfo();}
+function showAddApi(){document.getElementById('addApiForm').style.display='block';}
+function hideAddApi(){document.getElementById('addApiForm').style.display='none';}
+function saveApiProfile(){
+  const name=document.getElementById('apiName').value.trim()||'Agnes #'+(apiProfiles.length+1);
+  const key=document.getElementById('apiKeyInput').value.trim();
+  if(!key){alert('Ключ'); return}
+  const id='api_'+Date.now();
+  apiProfiles.push({id, name, provider:'agnes', baseUrl:'https://apihub.agnes-ai.com', apiKey:key, enabled:true});
+  saveApis(); hideAddApi();
+  document.getElementById('apiName').value=''; document.getElementById('apiKeyInput').value='';
+  if(!currentApiId){currentApiId=id; saveApis();} renderApiSelect();
+  devLog(`Добавлен ключ ${name}`);
+}
+function deleteApi(id){if(confirm('Удалить?')){const n=apiProfiles.find(a=>a.id==id)?.name; apiProfiles=apiProfiles.filter(a=>a.id!=id); if(currentApiId==id) currentApiId=apiProfiles[0]?.id||null; saveApis(); renderApiSelect(); devLog(`Удален ${n}`);}}
+function toggleApi(id){const a=apiProfiles.find(x=>x.id==id); if(a){a.enabled=!a.enabled; saveApis(); devLog(`${a.name} ${a.enabled?'вкл':'выкл'}`);}}
+function editApiKey(id){const a=apiProfiles.find(x=>x.id==id); if(!a) return; const nk=prompt('Новый ключ '+a.name, a.apiKey); if(nk!==null){a.apiKey=nk.trim(); saveApis(); devLog(`Обновлен ключ ${a.name}`);}}
+function selectCurrentApi(){currentApiId=document.getElementById('currentApiSelect').value; localStorage.setItem('currentApiIdAgnes', currentApiId); renderApis(); devLog(`Выбран ключ ${apiProfiles.find(a=>a.id==currentApiId)?.name}`);}
+function renderApis(){
+  const cont=document.getElementById('apiList');
+  if(apiProfiles.length==0){cont.innerHTML='<div class=note>Нет ключей</div>'; return}
+  cont.innerHTML=apiProfiles.map(ap=>`<div class="api-card ${currentApiId==ap.id?'active':''}" style="opacity:${ap.enabled?'1':'.5'}"><div class="api-dot ${ap.enabled?'on':''}"></div><div style="flex:1;min-width:0"><div style="font-size:11px;font-weight:700">${ap.name} ${currentApiId==ap.id?'<span class=badge green>выбран</span>':''}</div><div style="font-size:9px;color:#94a3b8">Agnes • ${ap.apiKey?ap.apiKey.slice(0,8)+'...'+ap.apiKey.slice(-4):'нет ключа'}</div></div><div style="display:flex;gap:4px"><button class=small-btn onclick="toggleApi('${ap.id}')">${ap.enabled?'Выкл':'Вкл'}</button><button class=small-btn onclick="editApiKey('${ap.id}')">Ключ</button><button class="small-btn danger" onclick="deleteApi('${ap.id}')">✕</button></div></div>`).join('');
+  const info=document.getElementById('selectedApiInfo'); if(info){const cur=apiProfiles.find(a=>a.id==currentApiId); info.textContent=cur?`Ключ: ${cur.name}`:'';}
+}
+function renderApiSelect(){
+  const sel=document.getElementById('currentApiSelect');
+  sel.innerHTML=apiProfiles.filter(a=>a.enabled).map(ap=>`<option value="${ap.id}" ${ap.id==currentApiId?'selected':''}>${ap.name}</option>`).join('');
+  if(!currentApiId && apiProfiles.length>0){currentApiId=apiProfiles[0].id; localStorage.setItem('currentApiIdAgnes', currentApiId);}
+  renderApis();
+}
+defaultApis(); renderApiSelect();
+
+// IMAGES
+function handleImages(e){
+  imagesBase64=[]; const c=document.getElementById('imgPreview'); c.innerHTML='';
+  if(e.target.files.length>5){alert('Макс 5'); return}
+  Array.from(e.target.files).forEach(f=>{
+    const img=document.createElement('img'); img.className='preview-img'; img.src=URL.createObjectURL(f); c.appendChild(img);
+    const r=new FileReader(); r.readAsDataURL(f); r.onload=()=>{imagesBase64.push(r.result); updatePrompt();};
+  });
+  devLog(`Загружено фото ${e.target.files.length}`);
+}
+function handleAudio(e){
+  audiosBase64=[]; const l=document.getElementById('audioList'); l.innerHTML='';
+  Array.from(e.target.files).forEach((f,i)=>{l.innerHTML+=`🎵 ${f.name}<br>`; const r=new FileReader(); r.readAsDataURL(f); r.onload=()=>audiosBase64.push(r.result);});
+}
+
+function recalcDurations(){
+  const total=12;
+  const n=segments.length;
+  if(n==0) return;
+  let sum=0;
+  for(let i=0;i<n-1;i++) sum+=segments[i].duration;
+  // Ensure last fills remainder, but if sum >12, normalize
+  if(sum>=total){
+    const eq=total/n;
+    segments.forEach(s=>s.duration=eq);
+  } else {
+    segments[n-1].duration=total-sum;
+  }
+  // Fix floating errors
+  let s=segments.reduce((a,b)=>a+b.duration,0);
+  if(Math.abs(s-total)>0.01){
+    segments[n-1].duration+=total-s;
+  }
+}
+
+function addSegment(){
+  if(segments.length>=6) return alert('Макс 6 таймингов');
+  const n=segments.length+1;
+  const eq=12/n;
+  segments.forEach(s=>s.duration=eq);
+  segments.push({id:Date.now(), duration:eq, emotion:'улыбается', camera:'крупный план', speech:'', prompt:''});
+  // Renormalize to 12
+  const total=segments.reduce((a,b)=>a+b.duration,0);
+  const factor=12/total;
+  segments.forEach(s=>s.duration*=factor);
+  render();
+  devLog(`Добавлен тайминг, всего ${segments.length}`);
+}
+function delSeg(id){
+  if(segments.length==1) return alert('Должен остаться хотя бы 1');
+  segments=segments.filter(s=>s.id!=id);
+  const eq=12/segments.length;
+  segments.forEach(s=>s.duration=eq);
+  render();
+  devLog(`Удален тайминг, осталось ${segments.length}`);
+}
+function render(){
+  recalcDurations();
+  const cont=document.getElementById('segmentsContainer');
+  const track=document.getElementById('timelineTrack');
+  cont.innerHTML='';
+  track.innerHTML='';
+  let cur=0;
+  segments.forEach((s,i)=>{
+    const left=(cur/12)*100;
+    const width=(s.duration/12)*100;
+    const segDiv=document.createElement('div');
+    segDiv.className='timeline-seg';
+    segDiv.style.left=left+'%';
+    segDiv.style.width=width+'%';
+    segDiv.textContent=`${i+1} ${s.duration.toFixed(1)}с`;
+    track.appendChild(segDiv);
+    if(i<segments.length-1){
+      const handle=document.createElement('div');
+      handle.className='timeline-handle';
+      handle.style.left=(left+width)+'%';
+      handle.title='Тяни чтобы менять длительность';
+      let startX=0, startDur=0, nextDur=0;
+      handle.addEventListener('pointerdown', (e)=>{
+        startX=e.clientX; startDur=s.duration; nextDur=segments[i+1].duration;
+        const onMove=(ev)=>{
+          const dx=ev.clientX-startX;
+          const dSec=(dx/track.clientWidth)*12;
+          let newDur=Math.max(0.5, Math.min(11, startDur+dSec));
+          let newNext=Math.max(0.5, startDur+nextDur - newDur);
+          if(newNext<0.5){newNext=0.5; newDur=startDur+nextDur-0.5;}
+          s.duration=newDur;
+          segments[i+1].duration=newNext;
+          render();
+        };
+        const onUp=()=>{document.removeEventListener('pointermove', onMove); document.removeEventListener('pointerup', onUp); devLog(`Ползунок тайминга ${i+1}: ${s.duration.toFixed(1)}с / ${segments[i+1].duration.toFixed(1)}с`);};
+        document.addEventListener('pointermove', onMove);
+        document.addEventListener('pointerup', onUp);
+      });
+      track.appendChild(handle);
+    }
+    cur+=s.duration;
+  });
+  cur=0;
+  segments.forEach((s,i)=>{
+    const div=document.createElement('div'); div.className='segment';
+    const start=cur; const end=cur+s.duration;
+    div.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center"><b>#${i+1} <span style="font-size:11px;color:#22c55e">${start.toFixed(1)}-${end.toFixed(1)}с (${s.duration.toFixed(1)}с)</span></b><div style="display:flex;gap:4px"><input type="range" min="0.5" max="11" step="0.1" value="${s.duration}" style="width:80px" oninput="updateSeg(${s.id},'duration',this.value)"><button class="small-btn danger" onclick="delSeg(${s.id})">✕</button></div></div>
+    <div class="row"><div class="col"><label>Эмоция</label><select onchange="updateSeg(${s.id},'emotion',this.value)"><option ${s.emotion=='улыбается'?'selected':''}>улыбается</option><option ${s.emotion=='злится'?'selected':''}>злится</option><option ${s.emotion=='хмурится'?'selected':''}>хмурится</option><option ${s.emotion=='нейтрально'?'selected':''}>нейтрально</option></select></div><div class="col"><label>Камера</label><select onchange="updateSeg(${s.id},'camera',this.value)"><option ${s.camera.includes('общий')?'selected':''}>общий план</option><option ${s.camera.includes('крупный')?'selected':''}>крупный план</option><option ${s.camera.includes('статика')?'selected':''}>статика</option><option ${s.camera.includes('средний')?'selected':''}>средний план</option></select></div></div>
+    <div class="row"><div class="col"><label>🗣️ Речь (входит в 15 слов)</label><input type="text" value="${s.speech}" placeholder="реплика" oninput="updateSeg(${s.id},'speech',this.value)" style="border-color:${s.speech?'#22c55e':'#475569'}"></div><div class="col"><label>🎨 Промт (визуал, не произносится)</label><input type="text" value="${s.prompt}" placeholder="cinematic rain, neon" oninput="updateSeg(${s.id},'prompt',this.value)"></div></div>`;
+    cont.appendChild(div);
+    cur=end;
+  });
+  updatePrompt();
+}
+function updateSeg(id,f,v){
+  const s=segments.find(x=>x.id==id); if(!s) return;
+  if(f=='duration'){const nv=parseFloat(v); const idx=segments.findIndex(x=>x.id==id); if(idx<segments.length-1){const diff=nv-s.duration; const next=segments[idx+1]; const newNext=next.duration-diff; if(newNext>=0.5){next.duration=newNext; s.duration=nv;}} else {s.duration=nv;} recalcDurations();}
+  else s[f]=v;
+  render();
+}
+function collectSpeech(){return segments.map(s=>s.speech).filter(Boolean).join(' ').trim();}
+function updatePrompt(){
+  const all=collectSpeech(); const words=all?all.split(/\s+/).filter(Boolean).length:0;
+  const c=document.getElementById('wordCounter'); c.textContent=`${words} / 15 слов`; c.style.color=words>15?'#f87171':'#4ade80';
+  let cur=0; let lines=[]; lines.push(`TASK: 12s video, agnes-video-2.5-flash, 720P, identity 100% from Picture 1`); lines.push(``); lines.push(`TIMELINE (slider-adjusted):`);
+  segments.forEach((s,i)=>{
+    const st=cur.toFixed(1); const en=(cur+s.duration).toFixed(1);
+    let line=`[${st}-${en}s] CAMERA:${s.camera}, EMOTION:${s.emotion}`;
+    if(s.prompt) line+=`, VISUAL:${s.prompt}`;
+    if(s.speech) line+=` => SAY: "${s.speech}"`;
+    else line+=` => SILENT`;
+    lines.push(line);
+    cur+=s.duration;
+  });
+  lines.push(``); lines.push(`CRITICAL: Speak ONLY text inside " ". Full="${all}" (${words}/15). NEVER speak CAMERA/EMOTION/PROMPT. SILENT=mouth closed. RU lip-sync.`);
+  document.getElementById('finalPrompt').value=lines.join('\n');
+}
+
+// DB QUEUE
+let db;
+function openDB(){return new Promise((res,rej)=>{const req=indexedDB.open('AgnesSlider_v1',1); req.onupgradeneeded=e=>{const d=e.target.result; if(!d.objectStoreNames.contains('queue')) d.createObjectStore('queue',{keyPath:'id'})}; req.onsuccess=e=>{db=e.target.result; res(db)}; req.onerror=e=>rej(e);});}
+async function dbSaveQueue(q){await openDB(); const tx=db.transaction('queue','readwrite'); const s=tx.objectStore('queue'); s.clear(); q.forEach(i=>s.put(i)); return new Promise(r=>{tx.oncomplete=()=>r()});}
+async function dbLoadQueue(){await openDB(); return new Promise(res=>{const tx=db.transaction('queue','readonly'); const req=tx.objectStore('queue').getAll(); req.onsuccess=()=>res(req.result||[])});}
+async function dbDeleteQueue(){await openDB(); const tx=db.transaction('queue','readwrite'); tx.objectStore('queue').clear();}
+let queue=[], queueRunning=false, queuePaused=false;
+
+async function addToQueue(){
+  const all=collectSpeech(); const words=all.split(/\s+/).filter(Boolean).length;
+  if(words>15){alert('>15 слов'); return}
+  if(imagesBase64.length==0){alert('Фото!'); return}
+  const apiId=currentApiId||apiProfiles[0]?.id;
+  const api=apiProfiles.find(a=>a.id==apiId);
+  if(!api||!api.apiKey){alert('Выбери Agnes ключ в настройках'); return}
+  const item={id:Date.now(), prompt:document.getElementById('finalPrompt').value, speech:all, words, segments:JSON.parse(JSON.stringify(segments)), images:[...imagesBase64], audios:[...audiosBase64], apiId:api.id, apiName:api.name, status:'waiting', url:null, created:new Date().toLocaleTimeString(), thumb:imagesBase64[0]};
+  queue.push(item); await dbSaveQueue(queue); renderQueue(); devLog(`В очередь #${queue.length} ${all.slice(0,20)} [${api.name}]`);
+}
+async function renderQueue(){
+  if(queue.length==0) queue=await dbLoadQueue();
+  const cont=document.getElementById('queueList'); const info=document.getElementById('queueInfo');
+  if(info) info.textContent=`${queue.length} задач, ${queue.filter(q=>q.status=='done').length} готово`;
+  if(queue.length==0){cont.innerHTML='<div class=note>Очередь пуста</div>'; return}
+  cont.innerHTML=queue.map((it,i)=>`<div style="background:#1e293b;border:1px solid ${it.status=='rendering'?'#8b5cf6':it.status=='done'?'#22c55e':'#334155'};border-radius:8px;padding:8px;display:flex;gap:8px"><img src="${it.thumb||''}" style="width:44px;height:44px;border-radius:6px;object-fit:cover"><div style="flex:1;min-width:0"><div style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><b>#${i+1} ${it.words}/15</b> ${it.speech||''} <span class=badge style="background:#0f172a;border:1px solid #334155">${it.apiName}</span></div><div style="font-size:10px;color:#94a3b8">${it.created} • ${it.status}</div>${it.url?`<video src="${it.url}" style="height:60px;border-radius:6px" muted></video>`:''}</div><div style="display:flex;flex-direction:column;gap:4px"><button class=small-btn onclick="moveQueue(${it.id},-1)">↑</button><button class=small-btn onclick="moveQueue(${it.id},1)">↓</button><button class="small-btn danger" onclick="removeQueue(${it.id})">✕</button></div></div>`).join('');
+  updateDbInfo();
+}
+async function removeQueue(id){queue=queue.filter(q=>q.id!=id); await dbSaveQueue(queue); renderQueue(); devLog(`Удалена задача ${id}`);}
+async function clearQueue(){if(confirm('Очистить?')){queue=[]; await dbDeleteQueue(); renderQueue(); devLog('Очередь очищена');}}
+async function moveQueue(id,dir){const idx=queue.findIndex(q=>q.id==id); if(idx==-1) return; const n=idx+dir; if(n<0||n>=queue.length) return; const t=queue[idx]; queue[idx]=queue[n]; queue[n]=t; await dbSaveQueue(queue); renderQueue();}
+function pauseQueue(){queuePaused=true; queueRunning=false; devLog('Пауза очереди');}
+function updateDbInfo(){const el=document.getElementById('dbInfo'); if(el){el.textContent=`Queue: ${queue.length} | APIs: ${apiProfiles.length} | IndexedDB: AgnesSlider_v1`;}}
+
+async function startQueue(){
+  if(queue.length==0){alert('Пусто'); return}
+  if(queueRunning){alert('Уже'); return}
+  queueRunning=true; queuePaused=false;
+  try{if(document.getElementById('bgModeToggle').checked && 'wakeLock' in navigator){await navigator.wakeLock.request('screen'); devLog('WakeLock активен (фон)');}}catch(e){}
+  devLog(`Старт очереди ${queue.length} задач`);
+  for(let i=0;i<queue.length;i++){
+    if(queuePaused){queueRunning=false; return}
+    const item=queue[i]; if(item.status=='done') continue;
+    const liveApi=apiProfiles.find(a=>a.id==item.apiId) || apiProfiles.find(a=>a.enabled);
+    const useKey=liveApi?.apiKey||'';
+    const useBase=liveApi?.baseUrl||'https://apihub.agnes-ai.com';
+    item.status='rendering'; await dbSaveQueue(queue); renderQueue();
+    document.getElementById('status').textContent=`Очередь ${i+1}/${queue.length} [${liveApi?.name}]`;
+    devLog(`Отправка ${i+1}/${queue.length} через ${liveApi?.name} prompt ${item.words} слов`);
+    try{
+      const payload={model:'agnes-video-2.5-flash', prompt:item.prompt, mode:'reference', aspect_ratio:'16:9', size:'720P', seconds:'12', images:item.images};
+      if(item.audios?.length>0) payload.audios=item.audios;
+      const r=await fetch(`${useBase}/v1/videos`,{method:'POST', headers:{'Authorization':`Bearer ${useKey}`,'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+      if(!r.ok){
+        const txt=await r.text();
+        devLog(`Ошибка API ${liveApi?.name}: ${r.status} ${txt.slice(0,100)}`);
+        const nextApi=apiProfiles.find(a=>a.enabled && a.id!=liveApi?.id && a.apiKey);
+        if(nextApi){devLog(`Фолбэк на ${nextApi.name}`); item.apiId=nextApi.id; item.apiName=nextApi.name; i--; await dbSaveQueue(queue); renderQueue(); await new Promise(r=>setTimeout(r,1000)); continue;}
+        item.status='failed'; await dbSaveQueue(queue); renderQueue(); continue;
+      }
+      const d=await r.json(); const vid=d.video_id||d.id; devLog(`Задача создана ${vid}`);
+      const poll=`${useBase}/agnesapi?video_id=${vid}&model_name=agnes-video-2.5-flash`;
+      await new Promise(res=>{
+        const timer=setInterval(async()=>{
+          if(queuePaused){clearInterval(timer); res(); return}
+          const pr=await fetch(poll,{headers:{'Authorization':`Bearer ${useKey}`}});
+          if(!pr.ok) return;
+          const pj=await pr.json();
+          document.getElementById('status').textContent=`${i+1}/${queue.length} ${pj.status} [${liveApi?.name}]`;
+          if(pj.status=='completed'){
+            clearInterval(timer);
+            const url=pj.metadata?.url||pj.url||pj.video_url;
+            item.url=url; item.status='done';
+            let h=JSON.parse(localStorage.getItem('agnesHistory')||'[]'); h.unshift({id:Date.now(), url, prompt:item.prompt, date:new Date().toLocaleString(), words:item.words, api:item.apiName}); localStorage.setItem('agnesHistory', JSON.stringify(h.slice(0,30))); renderHistory();
+            if(document.getElementById('autoSaveToggle').checked){const a=document.createElement('a'); a.href=url; a.download=`queue-${i+1}-${Date.now()}.mp4`; document.body.appendChild(a); a.click(); document.body.removeChild(a); devLog(`Автосохранено ${url}`);}
+            else devLog(`Готово ${url} (автосохранение выкл)`);
+            dbSaveQueue(queue); renderQueue(); res();
+          }else if(pj.status=='failed'){clearInterval(timer); item.status='failed'; dbSaveQueue(queue); renderQueue(); devLog(`Задача ${vid} failed`); res();}
+        },3000);
+      });
+    }catch(e){item.status='failed'; await dbSaveQueue(queue); renderQueue(); devLog(`Исключение ${e.message}`);}
+  }
+  queueRunning=false;
+  document.getElementById('status').textContent=`Готово ${queue.filter(q=>q.status=='done').length}/${queue.length}`;
+  devLog(`Очередь завершена`);
+}
+
+async function generate(){
+  const prompt=document.getElementById('finalPrompt').value.trim();
+  const all=collectSpeech(); const words=all.split(/\s+/).filter(Boolean).length;
+  if(words>15){alert('>15'); return}
+  const apiId=currentApiId||apiProfiles[0]?.id;
+  const api=apiProfiles.find(a=>a.id==apiId);
+  if(!api||!api.apiKey){alert('Выбери Agnes ключ в настройках'); return}
+  if(imagesBase64.length==0){alert('Фото'); return}
+  const status=document.getElementById('status'); const result=document.getElementById('result');
+  status.textContent='Отправка через '+api.name+'...'; result.innerHTML=''; devLog(`Генерация одиночная через ${api.name} ${words} слов`);
+  const payload={model:'agnes-video-2.5-flash', prompt, mode:'reference', aspect_ratio:'16:9', size:'720P', seconds:'12', images:imagesBase64};
+  if(audiosBase64.length>0) payload.audios=audiosBase64;
+  try{
+    const r=await fetch(`${api.baseUrl}/v1/videos`,{method:'POST', headers:{'Authorization':`Bearer ${api.apiKey}`,'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+    if(!r.ok){const txt=await r.text(); status.textContent=txt; devLog(`Ошибка одиночной ${r.status} ${txt}`); return}
+    const d=await r.json(); const vid=d.video_id||d.id; devLog(`Задача одиночная ${vid}`);
+    const poll=`${api.baseUrl}/agnesapi?video_id=${vid}&model_name=agnes-video-2.5-flash`;
+    const timer=setInterval(async()=>{
+      const pr=await fetch(poll,{headers:{'Authorization':`Bearer ${api.apiKey}`}});
+      if(!pr.ok) return;
+      const pj=await pr.json();
+      status.textContent=`[${api.name}] ${pj.status}`;
+      if(pj.status=='completed'){
+        clearInterval(timer);
+        const url=pj.metadata?.url||pj.url||pj.video_url;
+        result.innerHTML=`<a class="download-btn" href="${url}" target="_blank" style="display:block;background:#22c55e;color:#fff;text-align:center;padding:10px;border-radius:8px;text-decoration:none;font-weight:800;margin-bottom:8px">💾 Скачать MP4</a><video controls autoplay loop src="${url}" style="width:100%;border-radius:8px"></video>`;
+        let h=JSON.parse(localStorage.getItem('agnesHistory')||'[]'); h.unshift({id:Date.now(), url, prompt, date:new Date().toLocaleString(), words, api:api.name}); localStorage.setItem('agnesHistory', JSON.stringify(h.slice(0,30))); renderHistory();
+        if(document.getElementById('autoSaveToggle').checked){const a=document.createElement('a'); a.href=url; a.download=`agnes-${Date.now()}.mp4`; document.body.appendChild(a); a.click(); document.body.removeChild(a); devLog(`Автосохранено одиночное ${url}`);}
+        devLog(`Одиночное готово ${url}`);
+      }
+    },3000);
+  }catch(e){status.textContent=e.message; devLog(`Исключение одиночной ${e.message}`);}
+}
+function renderHistory(){
+  const h=JSON.parse(localStorage.getItem('agnesHistory')||'[]');
+  const c=document.getElementById('history');
+  if(h.length==0){c.innerHTML='<div class=note>Пусто</div>'; return}
+  c.innerHTML=h.map(it=>`<div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:8px"><div style="font-size:11px;color:#94a3b8">${it.date} • ${it.words}/15 • ${it.api||''}</div><video src="${it.url}" style="height:90px;width:100%" muted></video></div>`).join('');
+}
+render(); renderQueue(); renderHistory(); devLog('AI STUDIO запущен: 1 тайминг 12с по умолчанию, ползунок, Agnes only, автосохранение, лог');
+</script></body></html>
